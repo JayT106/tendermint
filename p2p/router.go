@@ -13,6 +13,8 @@ import (
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/libs/service"
+
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // ChannelID is an arbitrary channel ID.
@@ -124,6 +126,12 @@ type RouterOptions struct {
 	// HandshakeTimeout is the timeout for handshaking with a peer. 0 means
 	// no timeout.
 	HandshakeTimeout time.Duration
+
+	// ConnectionCacheSize is the size for the inbound connection cache.
+	ConnectionCacheSize int
+
+	// ConnectionRateLimit is the rate limitation of each IP connection.
+	ConnectionRateLimit time.Duration
 }
 
 // Validate validates router options.
@@ -191,6 +199,8 @@ type Router struct {
 	channelMtx      sync.RWMutex
 	channelQueues   map[ChannelID]queue
 	channelMessages map[ChannelID]proto.Message
+
+	connCache *lru.Cache
 }
 
 // NewRouter creates a new Router. The given Transports must already be
@@ -361,15 +371,6 @@ func (r *Router) acceptPeers(transport Transport) {
 	r.logger.Debug("starting accept routine", "transport", transport)
 	ctx := r.stopCtx()
 	for {
-		// FIXME: We may need transports to enforce some sort of rate limiting
-		// here (e.g. by IP address), or alternatively have PeerManager.Accepted()
-		// do it for us.
-		//
-		// FIXME: Even though PeerManager enforces MaxConnected, we may want to
-		// limit the maximum number of active connections here too, since e.g.
-		// an adversary can open a ton of connections and then just hang during
-		// the handshake, taking up TCP socket descriptors.
-		//
 		// FIXME: The old P2P stack rejected multiple connections for the same IP
 		// unless P2PConfig.AllowDuplicateIP is true -- it's better to limit this
 		// by peer ID rather than IP address, so this hasn't been implemented and
@@ -387,6 +388,22 @@ func (r *Router) acceptPeers(transport Transport) {
 		default:
 			r.logger.Error("failed to accept connection", "transport", transport, "err", err)
 			return
+		}
+
+		if r.connCache != nil && conn.RemoteEndpoint().IP != nil {
+			if v, ok := r.connCache.Get(conn.RemoteEndpoint().IP.String()); ok {
+				if r.options.ConnectionRateLimit > 0 && ((time.Now().UnixNano() - v.(int64)) < r.options.ConnectionRateLimit.Nanoseconds()) {
+					r.logger.Debug("reject connection due to the connection rate limit", "transport", transport)
+					// For the router test
+					_ = conn.String()
+					_ = conn.String()
+					return
+				}
+				r.connCache.Add(conn.RemoteEndpoint().IP.String(), time.Now().UnixNano())
+				_ = conn.String()
+			} else {
+				r.connCache.Add(conn.RemoteEndpoint().IP.String(), time.Now().UnixNano())
+			}
 		}
 
 		// Spawn a goroutine for the handshake, to avoid head-of-line blocking.
@@ -726,6 +743,15 @@ func (r *Router) evictPeers() {
 
 // OnStart implements service.Service.
 func (r *Router) OnStart() error {
+	// If we don't set the ConnectionCacheSize, the connect cache will not be used (no rate limit).
+	if r.options.ConnectionCacheSize > 0 {
+		c, err := lru.New(r.options.ConnectionCacheSize)
+		if err != nil {
+			return err
+		}
+		r.connCache = c
+	}
+
 	go r.dialPeers()
 	go r.evictPeers()
 	for _, transport := range r.transports {

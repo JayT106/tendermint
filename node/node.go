@@ -633,7 +633,7 @@ func createRouter(
 	peerManager *p2p.PeerManager,
 	transport p2p.Transport,
 ) (*p2p.Router, error) {
-	return p2p.NewRouter(p2pLogger, nodeInfo, privKey, peerManager, []p2p.Transport{transport}, p2p.RouterOptions{})
+	return p2p.NewRouter(p2pLogger, nodeInfo, privKey, peerManager, []p2p.Transport{transport}, p2p.RouterOptions{ConnectionCacheSize: 1000, ConnectionRateLimit: time.Minute})
 }
 
 func createSwitch(config *cfg.Config,
