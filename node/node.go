@@ -10,6 +10,7 @@ import (
 	"net/http"
 	_ "net/http/pprof" // nolint: gosec // securely exposed on separate, optional port
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -274,18 +275,20 @@ func createAndStartIndexerService(
 		blockIndexer indexer.BlockIndexer
 	)
 
-	switch config.TxIndex.Indexer {
-	case "kv":
-		store, err := dbProvider(&DBContext{"tx_index", config})
-		if err != nil {
-			return nil, nil, nil, err
-		}
+	for _, db := range config.TxIndex.Indexer {
+		if strings.ToLower(db) == "null" {
+			txIndexer = &null.TxIndex{}
+			blockIndexer = &blockidxnull.BlockerIndexer{}
+			break
+		} else {
+			store, err := dbProvider(&DBContext{"tx_index", config})
+			if err != nil {
+				return nil, nil, nil, err
+			}
 
-		txIndexer = kv.NewTxIndex(store)
-		blockIndexer = blockidxkv.New(dbm.NewPrefixDB(store, []byte("block_events")))
-	default:
-		txIndexer = &null.TxIndex{}
-		blockIndexer = &blockidxnull.BlockerIndexer{}
+			txIndexer = kv.NewTxIndex(store)
+			blockIndexer = blockidxkv.New(dbm.NewPrefixDB(store, []byte("block_events")))
+		}
 	}
 
 	indexerService := indexer.NewIndexerService(txIndexer, blockIndexer, eventBus)
