@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof" // nolint: gosec // securely exposed on separate, optional port
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -44,10 +45,8 @@ import (
 	rpcserver "github.com/tendermint/tendermint/rpc/jsonrpc/server"
 	sm "github.com/tendermint/tendermint/state"
 	"github.com/tendermint/tendermint/state/indexer"
-	blockidxkv "github.com/tendermint/tendermint/state/indexer/block/kv"
-	blockidxnull "github.com/tendermint/tendermint/state/indexer/block/null"
-	"github.com/tendermint/tendermint/state/indexer/tx/kv"
-	"github.com/tendermint/tendermint/state/indexer/tx/null"
+	kvSink "github.com/tendermint/tendermint/state/indexer/sink/kv"
+	nullSink "github.com/tendermint/tendermint/state/indexer/sink/null"
 	"github.com/tendermint/tendermint/statesync"
 	"github.com/tendermint/tendermint/store"
 	"github.com/tendermint/tendermint/types"
@@ -227,8 +226,7 @@ type Node struct {
 	evidencePool      *evidence.Pool // tracking evidence
 	proxyApp          proxy.AppConns // connection to the application
 	rpcListeners      []net.Listener // rpc servers
-	txIndexer         indexer.TxIndexer
-	blockIndexer      indexer.BlockIndexer
+	eventSinks        []indexer.EventSink
 	indexerService    *indexer.Service
 	prometheusSrv     *http.Server
 }
@@ -268,37 +266,32 @@ func createAndStartIndexerService(
 	dbProvider DBProvider,
 	eventBus *types.EventBus,
 	logger log.Logger,
-) (*indexer.Service, indexer.TxIndexer, indexer.BlockIndexer, error) {
+) (*indexer.Service, []indexer.EventSink, error) {
 
-	var (
-		txIndexer    indexer.TxIndexer
-		blockIndexer indexer.BlockIndexer
-	)
+	eventSinks := []indexer.EventSink{}
 
 	for _, db := range config.TxIndex.Indexer {
 		if strings.ToLower(db) == "null" {
-			txIndexer = &null.TxIndex{}
-			blockIndexer = &blockidxnull.BlockerIndexer{}
+			eventSinks = append([]indexer.EventSink{}, nullSink.NewNullEventSink())
 			break
 		} else {
 			store, err := dbProvider(&DBContext{"tx_index", config})
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, err
 			}
 
-			txIndexer = kv.NewTxIndex(store)
-			blockIndexer = blockidxkv.New(dbm.NewPrefixDB(store, []byte("block_events")))
+			eventSinks = append(eventSinks, kvSink.NewKVEventSink(store))
 		}
 	}
 
-	indexerService := indexer.NewIndexerService(txIndexer, blockIndexer, eventBus)
+	indexerService := indexer.NewIndexerService(eventSinks, eventBus)
 	indexerService.SetLogger(logger.With("module", "txindex"))
 
 	if err := indexerService.Start(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	return indexerService, txIndexer, blockIndexer, nil
+	return indexerService, eventSinks, nil
 }
 
 func doHandshake(
@@ -1044,7 +1037,7 @@ func NewNode(config *cfg.Config,
 		return nil, err
 	}
 
-	indexerService, txIndexer, blockIndexer, err := createAndStartIndexerService(config, dbProvider, eventBus, logger)
+	indexerService, eventSinks, err := createAndStartIndexerService(config, dbProvider, eventBus, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -1110,7 +1103,7 @@ func NewNode(config *cfg.Config,
 
 	// TODO: Fetch and provide real options and do proper p2p bootstrapping.
 	// TODO: Use a persistent peer database.
-	nodeInfo, err := makeNodeInfo(config, nodeKey, txIndexer, genDoc, state)
+	nodeInfo, err := makeNodeInfo(config, nodeKey, eventSinks, genDoc, state)
 	if err != nil {
 		return nil, err
 	}
@@ -1316,9 +1309,8 @@ func NewNode(config *cfg.Config,
 		evidenceReactor:  evReactor,
 		evidencePool:     evPool,
 		proxyApp:         proxyApp,
-		txIndexer:        txIndexer,
 		indexerService:   indexerService,
-		blockIndexer:     blockIndexer,
+		eventSinks:       eventSinks,
 		eventBus:         eventBus,
 	}
 	node.BaseService = *service.NewBaseService(logger, "Node", node)
@@ -1538,8 +1530,7 @@ func (n *Node) ConfigureRPC() (*rpccore.Environment, error) {
 		P2PTransport:   n,
 
 		GenDoc:           n.genesisDoc,
-		TxIndexer:        n.txIndexer,
-		BlockIndexer:     n.blockIndexer,
+		EventSinks:       n.eventSinks,
 		ConsensusReactor: n.consensusReactor,
 		EventBus:         n.eventBus,
 		Mempool:          n.mempool,
@@ -1764,9 +1755,9 @@ func (n *Node) Config() *cfg.Config {
 	return n.config
 }
 
-// TxIndexer returns the Node's TxIndexer.
-func (n *Node) TxIndexer() indexer.TxIndexer {
-	return n.txIndexer
+// EventSink returns the Node's Indexer.
+func (n *Node) EventSink() []indexer.EventSink {
+	return n.eventSinks
 }
 
 //------------------------------------------------------------------------------
@@ -1789,12 +1780,13 @@ func (n *Node) NodeInfo() p2p.NodeInfo {
 func makeNodeInfo(
 	config *cfg.Config,
 	nodeKey p2p.NodeKey,
-	txIndexer indexer.TxIndexer,
+	eventSinks []indexer.EventSink,
 	genDoc *types.GenesisDoc,
 	state sm.State,
 ) (p2p.NodeInfo, error) {
 	txIndexerStatus := "on"
-	if _, ok := txIndexer.(*null.TxIndex); ok {
+
+	if len(eventSinks) == 0 || reflect.ValueOf(eventSinks[0]).Elem().Type().Name() == "NullEventSink" {
 		txIndexerStatus = "off"
 	}
 
