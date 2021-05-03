@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof" // nolint: gosec // securely exposed on separate, optional port
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -1786,7 +1785,7 @@ func makeNodeInfo(
 ) (p2p.NodeInfo, error) {
 	txIndexerStatus := "on"
 
-	if len(eventSinks) == 0 || reflect.ValueOf(eventSinks[0]).Elem().Type().Name() == "NullEventSink" {
+	if len(eventSinks) == 0 || eventSinks[0].Type() == indexer.NULL {
 		txIndexerStatus = "off"
 	}
 
