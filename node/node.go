@@ -46,9 +46,9 @@ import (
 	rpcserver "github.com/tendermint/tendermint/rpc/jsonrpc/server"
 	sm "github.com/tendermint/tendermint/state"
 	"github.com/tendermint/tendermint/state/indexer"
-	kvSink "github.com/tendermint/tendermint/state/indexer/sink/kv"
-	nullSink "github.com/tendermint/tendermint/state/indexer/sink/null"
-	psqlsink "github.com/tendermint/tendermint/state/indexer/sink/psql"
+	"github.com/tendermint/tendermint/state/indexer/sink/kv"
+	"github.com/tendermint/tendermint/state/indexer/sink/null"
+	"github.com/tendermint/tendermint/state/indexer/sink/psql"
 	"github.com/tendermint/tendermint/statesync"
 	"github.com/tendermint/tendermint/store"
 	"github.com/tendermint/tendermint/types"
@@ -277,21 +277,21 @@ loop:
 		switch strings.ToLower(db) {
 		case string(indexer.NULL):
 			// when we see null in the config, the eventsinks will be reset with the nullEventSink.
-			eventSinks = append([]indexer.EventSink{}, nullSink.NewNullEventSink())
+			eventSinks = []indexer.EventSink{null.NewEventSink()}
 			break loop
 		case string(indexer.KV):
 			store, err := dbProvider(&DBContext{"tx_index", config})
 			if err != nil {
 				return nil, nil, err
 			}
-			eventSinks = append(eventSinks, kvSink.NewKVEventSink(store))
+			eventSinks = append(eventSinks, kv.NewEventSink(store))
 		case string(indexer.PSQL):
 			conn := config.TxIndex.PsqlConn
 			if conn == "" {
 				return nil, nil, errors.New("the psql connection settings cannot be empty")
 			}
 
-			es, db, err := psqlsink.NewPSQLEventSink(conn)
+			es, db, err := psql.NewEventSink(conn)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1773,8 +1773,8 @@ func (n *Node) Config() *cfg.Config {
 	return n.config
 }
 
-// EventSink returns the Node's Indexer.
-func (n *Node) EventSink() []indexer.EventSink {
+// EventSinks returns the Node's event indexing sinks.
+func (n *Node) EventSinks() []indexer.EventSink {
 	return n.eventSinks
 }
 
