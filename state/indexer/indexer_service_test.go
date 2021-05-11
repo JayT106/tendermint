@@ -122,7 +122,7 @@ func TestIndexerServiceIndexesBlocks(t *testing.T) {
 	store := db.NewMemDB()
 	eventSinks := []indexer.EventSink{kvsink.NewEventSink(store), pSink}
 
-	service := indexer.NewIndexerService(eventSinks, eventBus, nil)
+	service := indexer.NewIndexerService(eventSinks, eventBus)
 	service.SetLogger(tmlog.TestingLogger())
 	err = service.Start()
 	require.NoError(t, err)
