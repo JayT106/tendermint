@@ -23,7 +23,7 @@ const (
 	// chunkTimeout is the timeout while waiting for the next chunk from the chunk queue.
 	chunkTimeout = 2 * time.Minute
 	// requestTimeout is the timeout before rerequesting a chunk, possibly from a different peer.
-	chunkRequestTimeout = 10 * time.Second
+	chunkRequestTimeout = 180 * time.Second
 )
 
 var (
