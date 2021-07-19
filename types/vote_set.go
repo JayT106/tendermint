@@ -201,7 +201,7 @@ func (voteSet *VoteSet) addVote(vote *Vote) (added bool, err error) {
 
 	// Check signature.
 	if err := vote.Verify(voteSet.chainID, val.PubKey); err != nil {
-		return false, fmt.Errorf("failed to verify vote with ChainID %s and PubKey %s: %w", voteSet.chainID, val.PubKey, err)
+		return false, fmt.Errorf("failed to verify vote with ChainID %s and PubKey %s, %s: %w", voteSet.chainID, val.PubKey, vote, err)
 	}
 
 	// Add vote and get conflicting vote if any.
