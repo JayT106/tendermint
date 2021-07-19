@@ -322,9 +322,13 @@ func (pv *FilePV) signVote(chainID string, vote *tmproto.Vote) error {
 	if sameHRS {
 		if bytes.Equal(signBytes, lss.SignBytes) {
 			vote.Signature = lss.Signature
+
+			fmt.Sprintln("vote sig 1", vote.String())
 		} else if timestamp, ok := checkVotesOnlyDifferByTimestamp(lss.SignBytes, signBytes); ok {
 			vote.Timestamp = timestamp
 			vote.Signature = lss.Signature
+
+			fmt.Sprintln("vote sig 2", vote.String())
 		} else {
 			err = fmt.Errorf("conflicting data")
 		}
@@ -338,6 +342,7 @@ func (pv *FilePV) signVote(chainID string, vote *tmproto.Vote) error {
 	}
 	pv.saveSigned(height, round, step, signBytes, sig)
 	vote.Signature = sig
+	fmt.Sprintln("vote sig 3", vote.String())
 	return nil
 }
 
