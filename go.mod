@@ -32,11 +32,11 @@ require (
 	github.com/sasha-s/go-deadlock v0.2.1-0.20190427202633-1595213edefa
 	github.com/snikch/goodman v0.0.0-20171125024755-10e37e294daa
 	github.com/spf13/cobra v1.1.3
-	github.com/spf13/viper v1.8.1
+	github.com/spf13/viper v1.9.0
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tm-db v0.6.4
-	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
-	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
-	google.golang.org/grpc v1.38.0
+	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
+	golang.org/x/net v0.0.0-20210503060351-7fd8e65b6420
+	google.golang.org/grpc v1.40.0
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
 )
