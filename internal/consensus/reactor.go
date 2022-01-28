@@ -670,7 +670,11 @@ func (r *Reactor) pickSendVote(ctx context.Context, ps *PeerState, votes types.V
 		return false, err
 	}
 
-	ps.SetHasVote(vote)
+	// the vote should be non-nil.
+	if err := ps.SetHasVote(vote); err != nil {
+		return false, err
+	}
+
 	return true, nil
 }
 
@@ -1101,8 +1105,9 @@ func (r *Reactor) handleStateMessage(ctx context.Context, envelope *p2p.Envelope
 		ps.ApplyNewValidBlockMessage(msgI.(*NewValidBlockMessage))
 
 	case *tmcons.HasVote:
-		ps.ApplyHasVoteMessage(msgI.(*HasVoteMessage))
-
+		if err := ps.ApplyHasVoteMessage(msgI.(*HasVoteMessage)); err != nil {
+			return err
+		}
 	case *tmcons.VoteSetMaj23:
 		r.state.mtx.RLock()
 		height, votes := r.state.Height, r.state.Votes
@@ -1236,7 +1241,9 @@ func (r *Reactor) handleVoteMessage(ctx context.Context, envelope *p2p.Envelope,
 
 		ps.EnsureVoteBitArrays(height, valSize)
 		ps.EnsureVoteBitArrays(height-1, lastCommitSize)
-		ps.SetHasVote(vMsg.Vote)
+		if err := ps.SetHasVote(vMsg.Vote); err != nil {
+			return err
+		}
 
 		select {
 		case r.state.peerMsgQueue <- msgInfo{vMsg, envelope.From, tmtime.Now()}:
