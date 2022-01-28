@@ -22,7 +22,7 @@ type BitArray struct {
 }
 
 // NewBitArray returns a new bit array.
-// It returns nil if the number of bits is zero.
+// It returns nil if the number of bits less equal than zero.
 func NewBitArray(bits int) *BitArray {
 	if bits <= 0 {
 		return nil
@@ -37,11 +37,12 @@ func (bA *BitArray) reset(bits int) {
 	bA.mtx.Lock()
 	defer bA.mtx.Unlock()
 
-	bA.Bits = bits
-	if bits == 0 {
+	if bits <= 0 {
+		bA.Bits = 0
 		bA.Elems = nil
 	} else {
-		bA.Elems = make([]uint64, numElems(bits))
+		bA.Bits = bits
+		bA.Elems = make([]uint64, numElems(uint(bits)))
 	}
 }
 
@@ -54,7 +55,7 @@ func (bA *BitArray) Size() int {
 }
 
 // GetIndex returns the bit at index i within the bit array.
-// The behavior is undefined if i >= bA.Bits
+// The behavior is undefined if i >= bA.Bits or i < 0
 func (bA *BitArray) GetIndex(i int) bool {
 	if bA == nil {
 		return false
@@ -65,7 +66,7 @@ func (bA *BitArray) GetIndex(i int) bool {
 }
 
 func (bA *BitArray) getIndex(i int) bool {
-	if i >= bA.Bits {
+	if i < 0 || i >= bA.Bits {
 		return false
 	}
 	return bA.Elems[i/64]&(uint64(1)<<uint(i%64)) > 0
@@ -114,7 +115,13 @@ func (bA *BitArray) copy() *BitArray {
 }
 
 func (bA *BitArray) copyBits(bits int) *BitArray {
-	c := make([]uint64, numElems(bits))
+	if bits <= 0 {
+		return &BitArray{
+			Bits:  0,
+			Elems: nil,
+		}
+	}
+	c := make([]uint64, numElems(uint(bits)))
 	copy(c, bA.Elems)
 	return &BitArray{
 		Bits:  bits,
@@ -138,10 +145,13 @@ func (bA *BitArray) Or(o *BitArray) *BitArray {
 	bA.mtx.Lock()
 	o.mtx.Lock()
 	c := bA.copyBits(tmmath.MaxInt(bA.Bits, o.Bits))
-	smaller := tmmath.MinInt(len(bA.Elems), len(o.Elems))
-	for i := 0; i < smaller; i++ {
-		c.Elems[i] |= o.Elems[i]
+	if c != nil {
+		smaller := tmmath.MinInt(len(bA.Elems), len(o.Elems))
+		for i := 0; i < smaller; i++ {
+			c.Elems[i] |= o.Elems[i]
+		}
 	}
+
 	bA.mtx.Unlock()
 	o.mtx.Unlock()
 	return c
@@ -165,9 +175,12 @@ func (bA *BitArray) And(o *BitArray) *BitArray {
 
 func (bA *BitArray) and(o *BitArray) *BitArray {
 	c := bA.copyBits(tmmath.MinInt(bA.Bits, o.Bits))
-	for i := 0; i < len(c.Elems); i++ {
-		c.Elems[i] &= o.Elems[i]
+	if c != nil {
+		for i := 0; i < len(c.Elems); i++ {
+			c.Elems[i] &= o.Elems[i]
+		}
 	}
+
 	return c
 }
 
@@ -202,15 +215,18 @@ func (bA *BitArray) Sub(o *BitArray) *BitArray {
 	o.mtx.Lock()
 	// output is the same size as bA
 	c := bA.copyBits(bA.Bits)
-	// Only iterate to the minimum size between the two.
-	// If o is longer, those bits are ignored.
-	// If bA is longer, then skipping those iterations is equivalent
-	// to right padding with 0's
-	smaller := tmmath.MinInt(len(bA.Elems), len(o.Elems))
-	for i := 0; i < smaller; i++ {
-		// &^ is and not in golang
-		c.Elems[i] &^= o.Elems[i]
+	if len(c.Elems) > 0 {
+		// Only iterate to the minimum size between the two.
+		// If o is longer, those bits are ignored.
+		// If bA is longer, then skipping those iterations is equivalent
+		// to right padding with 0's
+		smaller := tmmath.MinInt(len(bA.Elems), len(o.Elems))
+		for i := 0; i < smaller; i++ {
+			// &^ is and not in golang
+			c.Elems[i] &^= o.Elems[i]
+		}
 	}
+
 	bA.mtx.Unlock()
 	o.mtx.Unlock()
 	return c
@@ -278,6 +294,9 @@ func (bA *BitArray) PickRandom() (int, bool) {
 }
 
 func (bA *BitArray) getTrueIndices() []int {
+	if bA.Bits <= 0 {
+		return []int{}
+	}
 	trueIndices := make([]int, 0, bA.Bits)
 	curBit := 0
 	numElems := len(bA.Elems)
@@ -358,6 +377,10 @@ func (bA *BitArray) stringIndented(indent string) string {
 func (bA *BitArray) Bytes() []byte {
 	bA.mtx.Lock()
 	defer bA.mtx.Unlock()
+
+	if bA.Bits <= 0 {
+		return []byte{}
+	}
 
 	numBytes := (bA.Bits + 7) / 8
 	bytes := make([]byte, numBytes)
@@ -440,7 +463,7 @@ func (bA *BitArray) UnmarshalJSON(bz []byte) error {
 // nil/empty.
 func (bA *BitArray) ToProto() *tmprotobits.BitArray {
 	if bA == nil ||
-		(len(bA.Elems) == 0 && bA.Bits == 0) { // empty
+		(len(bA.Elems) == 0 && bA.Bits <= 0) { // empty
 		return nil
 	}
 
@@ -466,7 +489,7 @@ func (bA *BitArray) FromProto(protoBitArray *tmprotobits.BitArray) error {
 	if protoBitArray.Bits > math.MaxInt32 { // prevent overflow on 32bit systems
 		return errors.New("too many Bits")
 	}
-	if got, exp := len(protoBitArray.Elems), numElems(int(protoBitArray.Bits)); got != exp {
+	if got, exp := len(protoBitArray.Elems), numElems(uint(protoBitArray.Bits)); got != exp {
 		return fmt.Errorf("invalid number of Elems: got %d, but exp %d", got, exp)
 	}
 
@@ -481,6 +504,6 @@ func (bA *BitArray) FromProto(protoBitArray *tmprotobits.BitArray) error {
 	return nil
 }
 
-func numElems(bits int) int {
-	return (bits + 63) / 64
+func numElems(bits uint) int {
+	return int((bits + 63) / 64)
 }
