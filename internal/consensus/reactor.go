@@ -1106,6 +1106,7 @@ func (r *Reactor) handleStateMessage(ctx context.Context, envelope *p2p.Envelope
 
 	case *tmcons.HasVote:
 		if err := ps.ApplyHasVoteMessage(msgI.(*HasVoteMessage)); err != nil {
+			r.logger.Error("peer sent us an invalid HasVote msg", "msg", msg, "err", err)
 			return err
 		}
 	case *tmcons.VoteSetMaj23:
