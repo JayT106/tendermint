@@ -2,7 +2,6 @@ package mempool
 
 import (
 	"container/heap"
-	"sort"
 	"sync"
 )
 
@@ -36,10 +35,6 @@ func (pq *TxPriorityQueue) GetEvictableTxs(priority, txSize, totalSize, cap int6
 
 	txs := make([]*WrappedTx, len(pq.txs))
 	copy(txs, pq.txs)
-
-	sort.Slice(txs, func(i, j int) bool {
-		return txs[i].priority < txs[j].priority
-	})
 
 	var (
 		toEvict []*WrappedTx
