@@ -227,7 +227,7 @@ func makeNode(
 		if err := consensus.NewHandshaker(
 			logger.With("module", "handshaker"),
 			stateStore, state, blockStore, eventBus, genDoc,
-		).Handshake(ctx, proxyApp, genDoc.ConsensusParams.Version.AppVersion); err != nil {
+		).Handshake(ctx, proxyApp, genDoc.ConsensusParams.Version.AppVersion, genDoc.InitialHeight); err != nil {
 			return nil, combineCloseError(err, makeCloser(closers))
 		}
 

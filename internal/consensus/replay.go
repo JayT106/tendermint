@@ -238,7 +238,7 @@ func (h *Handshaker) NBlocks() int {
 }
 
 // TODO: retry the handshake/replay if it fails ?
-func (h *Handshaker) Handshake(ctx context.Context, appClient abciclient.Client, genDocAppVer uint64) error {
+func (h *Handshaker) Handshake(ctx context.Context, appClient abciclient.Client, genDocAppVer uint64, genDocInitHeight int64) error {
 
 	// Handshake is done via ABCI Info on the query conn.
 	res, err := appClient.Info(ctx, proxy.RequestInfo)
@@ -259,8 +259,10 @@ func (h *Handshaker) Handshake(ctx context.Context, appClient abciclient.Client,
 		"protocol-version", res.AppVersion,
 	)
 
-	// Check app version is matched with the genesis file.
-	if res.AppVersion != genDocAppVer {
+	// Check app version is matched with the genesis settings under two cases:
+	// 1. the node has no state
+	// 2. the node has state and the height is one below of the genesus initial height(genesis upgrade case)
+	if (h.initialState.LastBlockHeight == 0 || h.initialState.LastBlockHeight == genDocInitHeight-1) && res.AppVersion != genDocAppVer {
 		return fmt.Errorf("client app version (%d) is not matched with the genesis file (%d)",
 			res.AppVersion,
 			genDocAppVer)

@@ -343,7 +343,7 @@ func newConsensusStateForReplay(
 
 	handshaker := NewHandshaker(logger, stateStore, state, blockStore, eventBus, gdoc)
 
-	if err = handshaker.Handshake(ctx, proxyApp, gdoc.ConsensusParams.Version.AppVersion); err != nil {
+	if err = handshaker.Handshake(ctx, proxyApp, gdoc.ConsensusParams.Version.AppVersion, gdoc.InitialHeight); err != nil {
 		return nil, err
 	}
 

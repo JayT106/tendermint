@@ -782,7 +782,7 @@ func testHandshakeReplay(
 	require.NotNil(t, proxyApp)
 	t.Cleanup(func() { cancel(); proxyApp.Wait() })
 
-	err = handshaker.Handshake(ctx, proxyApp, genDoc.ConsensusParams.Version.AppVersion)
+	err = handshaker.Handshake(ctx, proxyApp, genDoc.ConsensusParams.Version.AppVersion, genDoc.InitialHeight)
 	if expectError {
 		require.Error(t, err)
 		return
@@ -995,7 +995,7 @@ func TestHandshakePanicsIfAppReturnsWrongAppHash(t *testing.T) {
 
 		assert.Panics(t, func() {
 			h := NewHandshaker(logger, stateStore, state, store, eventBus, genDoc)
-			if err = h.Handshake(ctx, proxyApp, genDoc.ConsensusParams.Version.AppVersion); err != nil {
+			if err = h.Handshake(ctx, proxyApp, genDoc.ConsensusParams.Version.AppVersion, genDoc.InitialHeight); err != nil {
 				t.Log(err)
 			}
 		})
@@ -1015,7 +1015,7 @@ func TestHandshakePanicsIfAppReturnsWrongAppHash(t *testing.T) {
 
 		assert.Panics(t, func() {
 			h := NewHandshaker(logger, stateStore, state, store, eventBus, genDoc)
-			if err = h.Handshake(ctx, proxyApp, genDoc.ConsensusParams.Version.AppVersion); err != nil {
+			if err = h.Handshake(ctx, proxyApp, genDoc.ConsensusParams.Version.AppVersion, genDoc.InitialHeight); err != nil {
 				t.Log(err)
 			}
 		})
@@ -1270,7 +1270,7 @@ func TestHandshakeUpdatesValidators(t *testing.T) {
 	proxyApp := proxy.New(client, logger, proxy.NopMetrics())
 	require.NoError(t, proxyApp.Start(ctx), "Error starting proxy app connections")
 
-	require.NoError(t, handshaker.Handshake(ctx, proxyApp, genDoc.ConsensusParams.Version.AppVersion), "error on abci handshake")
+	require.NoError(t, handshaker.Handshake(ctx, proxyApp, genDoc.ConsensusParams.Version.AppVersion, genDoc.InitialHeight), "error on abci handshake")
 
 	// reload the state, check the validator set was updated
 	state, err = stateStore.Load()
