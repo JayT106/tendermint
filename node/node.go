@@ -720,32 +720,32 @@ func NewNode(config *cfg.Config,
 	}
 
 	// Determine whether we should attempt state sync.
-	stateSync := config.StateSync.Enable && !onlyValidatorIsUs(state, pubKey)
-	if stateSync && state.LastBlockHeight > 0 {
-		logger.Info("Found local state with non-zero height, skipping state sync")
-		stateSync = false
-	}
+//	stateSync := config.StateSync.Enable && !onlyValidatorIsUs(state, pubKey)
+//	if stateSync && state.LastBlockHeight > 0 {
+//		logger.Info("Found local state with non-zero height, skipping state sync")
+//		stateSync = false
+//	}
 
 	// Create the handshaker, which calls RequestInfo, sets the AppVersion on the state,
 	// and replays any blocks as necessary to sync tendermint with the app.
 	consensusLogger := logger.With("module", "consensus")
-	if !stateSync {
-		if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
-			return nil, err
-		}
+//	if !stateSync {
+//		if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
+//			return nil, err
+//		}
 
 		// Reload the state. It will have the Version.Consensus.App set by the
 		// Handshake, and may have other modifications as well (ie. depending on
 		// what happened during block replay).
 		state, err = stateStore.Load()
-		if err != nil {
-			return nil, fmt.Errorf("cannot load state: %w", err)
-		}
-	}
+//		if err != nil {
+//			return nil, fmt.Errorf("cannot load state: %w", err)
+//		}
+//	}
 
 	// Determine whether we should do fast sync. This must happen after the handshake, since the
 	// app may modify the validator set, specifying ourself as the only validator.
-	fastSync := config.FastSyncMode && !onlyValidatorIsUs(state, pubKey)
+//	fastSync := config.FastSyncMode && !onlyValidatorIsUs(state, pubKey)
 
 	logNodeStartupInfo(state, pubKey, logger, consensusLogger)
 
@@ -771,21 +771,21 @@ func NewNode(config *cfg.Config,
 	)
 
 	// Make BlockchainReactor. Don't start fast sync if we're doing a state sync first.
-	bcReactor, err := createBlockchainReactor(config, state, blockExec, blockStore, fastSync && !stateSync, logger)
+	bcReactor, err := createBlockchainReactor(config, state, blockExec, blockStore, false, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not create blockchain reactor: %w", err)
 	}
 
 	// Make ConsensusReactor. Don't enable fully if doing a state sync and/or fast sync first.
 	// FIXME We need to update metrics here, since other reactors don't have access to them.
-	if stateSync {
-		csMetrics.StateSyncing.Set(1)
-	} else if fastSync {
-		csMetrics.FastSyncing.Set(1)
-	}
+	//if stateSync {
+	//	csMetrics.StateSyncing.Set(1)
+	//} else if fastSync {
+	//	csMetrics.FastSyncing.Set(1)
+//	}
 	consensusReactor, consensusState := createConsensusReactor(
 		config, state, blockExec, blockStore, mempool, evidencePool,
-		privValidator, csMetrics, stateSync || fastSync, eventBus, consensusLogger,
+		privValidator, csMetrics, false, eventBus, consensusLogger,
 	)
 
 	// Set up state sync reactor, and schedule a sync if requested.
@@ -873,7 +873,7 @@ func NewNode(config *cfg.Config,
 		consensusState:   consensusState,
 		consensusReactor: consensusReactor,
 		stateSyncReactor: stateSyncReactor,
-		stateSync:        stateSync,
+		stateSync:        false,
 		stateSyncGenesis: state, // Shouldn't be necessary, but need a way to pass the genesis state
 		pexReactor:       pexReactor,
 		evidencePool:     evidencePool,
