@@ -66,8 +66,8 @@ func NewBlockchainReactor(state sm.State, blockExec *sm.BlockExecutor, store *st
 	fastSync bool) *BlockchainReactor {
 
 	if state.LastBlockHeight != store.Height() {
-		panic(fmt.Sprintf("state (%v) and store (%v) height mismatch", state.LastBlockHeight,
-			store.Height()))
+//		panic(fmt.Sprintf("state (%v) and store (%v) height mismatch", state.LastBlockHeight,
+//			store.Height()))
 	}
 
 	requestsCh := make(chan BlockRequest, maxTotalRequesters)

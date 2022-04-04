@@ -543,11 +543,11 @@ func createSwitch(config *cfg.Config,
 		p2p.SwitchPeerFilters(peerFilters...),
 	)
 	sw.SetLogger(p2pLogger)
-	sw.AddReactor("MEMPOOL", mempoolReactor)
-	sw.AddReactor("BLOCKCHAIN", bcReactor)
-	sw.AddReactor("CONSENSUS", consensusReactor)
-	sw.AddReactor("EVIDENCE", evidenceReactor)
-	sw.AddReactor("STATESYNC", stateSyncReactor)
+	//	sw.AddReactor("MEMPOOL", mempoolReactor)
+		sw.AddReactor("BLOCKCHAIN", bcReactor)
+	//	sw.AddReactor("CONSENSUS", consensusReactor)
+	//	sw.AddReactor("EVIDENCE", evidenceReactor)
+	//	sw.AddReactor("STATESYNC", stateSyncReactor)
 
 	sw.SetNodeInfo(nodeInfo)
 	sw.SetNodeKey(nodeKey)
@@ -720,61 +720,61 @@ func NewNode(config *cfg.Config,
 	}
 
 	// Determine whether we should attempt state sync.
-//	stateSync := config.StateSync.Enable && !onlyValidatorIsUs(state, pubKey)
-//	if stateSync && state.LastBlockHeight > 0 {
-//		logger.Info("Found local state with non-zero height, skipping state sync")
-//		stateSync = false
-//	}
+	//	stateSync := config.StateSync.Enable && !onlyValidatorIsUs(state, pubKey)
+	//	if stateSync && state.LastBlockHeight > 0 {
+	//		logger.Info("Found local state with non-zero height, skipping state sync")
+	//		stateSync = false
+	//	}
 
 	// Create the handshaker, which calls RequestInfo, sets the AppVersion on the state,
 	// and replays any blocks as necessary to sync tendermint with the app.
 	consensusLogger := logger.With("module", "consensus")
-//	if !stateSync {
-//		if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
-//			return nil, err
-//		}
+	//	if !stateSync {
+	//		if err := doHandshake(stateStore, state, blockStore, genDoc, eventBus, proxyApp, consensusLogger); err != nil {
+	//			return nil, err
+	//		}
 
-		// Reload the state. It will have the Version.Consensus.App set by the
-		// Handshake, and may have other modifications as well (ie. depending on
-		// what happened during block replay).
-		state, err = stateStore.Load()
-//		if err != nil {
-//			return nil, fmt.Errorf("cannot load state: %w", err)
-//		}
-//	}
+	// Reload the state. It will have the Version.Consensus.App set by the
+	// Handshake, and may have other modifications as well (ie. depending on
+	// what happened during block replay).
+	state, err = stateStore.Load()
+	//		if err != nil {
+	//			return nil, fmt.Errorf("cannot load state: %w", err)
+	//		}
+	//	}
 
 	// Determine whether we should do fast sync. This must happen after the handshake, since the
 	// app may modify the validator set, specifying ourself as the only validator.
-//	fastSync := config.FastSyncMode && !onlyValidatorIsUs(state, pubKey)
+	//	fastSync := config.FastSyncMode && !onlyValidatorIsUs(state, pubKey)
 
 	logNodeStartupInfo(state, pubKey, logger, consensusLogger)
 
-	csMetrics, p2pMetrics, memplMetrics, smMetrics := metricsProvider(genDoc.ChainID)
+ 	_, p2pMetrics, memplMetrics, smMetrics := metricsProvider(genDoc.ChainID)
 
 	// Make MempoolReactor
-	mempoolReactor, mempool := createMempoolAndMempoolReactor(config, proxyApp, state, memplMetrics, logger)
+	_, mempool := createMempoolAndMempoolReactor(config, proxyApp, state, memplMetrics, logger)
 
 	// Make Evidence Reactor
-	evidenceReactor, evidencePool, err := createEvidenceReactor(config, dbProvider, stateDB, blockStore, logger)
+	_, evidencePool, err := createEvidenceReactor(config, dbProvider, stateDB, blockStore, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	// make block executor for consensus and blockchain reactors to execute blocks
-	blockExec := sm.NewBlockExecutor(
-		stateStore,
-		logger.With("module", "state"),
-		proxyApp.Consensus(),
-		mempool,
-		evidencePool,
-		sm.BlockExecutorWithMetrics(smMetrics),
-	)
+		blockExec := sm.NewBlockExecutor(
+			stateStore,
+			logger.With("module", "state"),
+			proxyApp.Consensus(),
+			mempool,
+			evidencePool,
+			sm.BlockExecutorWithMetrics(smMetrics),
+		)
 
 	// Make BlockchainReactor. Don't start fast sync if we're doing a state sync first.
-	bcReactor, err := createBlockchainReactor(config, state, blockExec, blockStore, false, logger)
-	if err != nil {
-		return nil, fmt.Errorf("could not create blockchain reactor: %w", err)
-	}
+		bcReactor, err := createBlockchainReactor(config, state, blockExec, blockStore, false, logger)
+		if err != nil {
+			return nil, fmt.Errorf("could not create blockchain reactor: %w", err)
+		}
 
 	// Make ConsensusReactor. Don't enable fully if doing a state sync and/or fast sync first.
 	// FIXME We need to update metrics here, since other reactors don't have access to them.
@@ -782,23 +782,23 @@ func NewNode(config *cfg.Config,
 	//	csMetrics.StateSyncing.Set(1)
 	//} else if fastSync {
 	//	csMetrics.FastSyncing.Set(1)
-//	}
-	consensusReactor, consensusState := createConsensusReactor(
-		config, state, blockExec, blockStore, mempool, evidencePool,
-		privValidator, csMetrics, false, eventBus, consensusLogger,
-	)
+	//	}
+	//	consensusReactor, consensusState := createConsensusReactor(
+	//		config, state, blockExec, blockStore, mempool, evidencePool,
+	//		privValidator, csMetrics, false, eventBus, consensusLogger,
+	//	)
 
 	// Set up state sync reactor, and schedule a sync if requested.
 	// FIXME The way we do phased startups (e.g. replay -> fast sync -> consensus) is very messy,
 	// we should clean this whole thing up. See:
 	// https://github.com/tendermint/tendermint/issues/4644
-	stateSyncReactor := statesync.NewReactor(
-		*config.StateSync,
-		proxyApp.Snapshot(),
-		proxyApp.Query(),
-		config.StateSync.TempDir,
-	)
-	stateSyncReactor.SetLogger(logger.With("module", "statesync"))
+	//	stateSyncReactor := statesync.NewReactor(
+	//		*config.StateSync,
+	//		proxyApp.Snapshot(),
+	//		proxyApp.Query(),
+	//		config.StateSync.TempDir,
+	//	)
+	//	stateSyncReactor.SetLogger(logger.With("module", "statesync"))
 
 	nodeInfo, err := makeNodeInfo(config, nodeKey, txIndexer, genDoc, state)
 	if err != nil {
@@ -811,8 +811,8 @@ func NewNode(config *cfg.Config,
 	// Setup Switch.
 	p2pLogger := logger.With("module", "p2p")
 	sw := createSwitch(
-		config, transport, p2pMetrics, peerFilters, mempoolReactor, bcReactor,
-		stateSyncReactor, consensusReactor, evidenceReactor, nodeInfo, nodeKey, p2pLogger,
+		config, transport, p2pMetrics, peerFilters, nil, bcReactor,
+		nil, nil, nil, nodeInfo, nodeKey, p2pLogger,
 	)
 
 	err = sw.AddPersistentPeers(splitAndTrimEmpty(config.P2P.PersistentPeers, ",", " "))
@@ -868,15 +868,15 @@ func NewNode(config *cfg.Config,
 		stateStore:       stateStore,
 		blockStore:       blockStore,
 		bcReactor:        bcReactor,
-		mempoolReactor:   mempoolReactor,
-		mempool:          mempool,
-		consensusState:   consensusState,
-		consensusReactor: consensusReactor,
-		stateSyncReactor: stateSyncReactor,
+		mempoolReactor:   nil,
+		mempool:          nil,
+		consensusState:   nil,
+		consensusReactor: nil,
+		stateSyncReactor: nil,
 		stateSync:        false,
 		stateSyncGenesis: state, // Shouldn't be necessary, but need a way to pass the genesis state
 		pexReactor:       pexReactor,
-		evidencePool:     evidencePool,
+		evidencePool:     nil,
 		proxyApp:         proxyApp,
 		txIndexer:        txIndexer,
 		indexerService:   indexerService,
