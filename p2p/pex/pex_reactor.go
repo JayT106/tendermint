@@ -567,6 +567,12 @@ func (r *Reactor) dialPeer(addr *p2p.NetAddress) error {
 			return err
 		}
 
+		if e, ok := err.(p2p.ErrRejected); ok && e.IsIncompatible() {
+			// NOTE: addr is removed from addrbook in switch.addOutboundPeerWithConfig()
+			r.attemptsToDial.Delete(addr.DialString())
+			return err
+		}
+
 		markAddrInBookBasedOnErr(addr, r.book, err)
 		switch err.(type) {
 		case p2p.ErrSwitchAuthenticationFailure:

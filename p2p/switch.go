@@ -754,6 +754,13 @@ func (sw *Switch) addOutboundPeerWithConfig(
 
 				return err
 			}
+
+			// If nodeInfo is incompatible, we should remove the address from the address book
+			// to avoid dialing in the future.
+			if e.IsIncompatible() {
+				sw.addrBook.RemoveAddress(addr)
+				return err
+			}
 		}
 
 		// retry persistent peers after
