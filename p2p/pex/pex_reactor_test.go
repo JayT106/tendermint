@@ -618,14 +618,6 @@ func createReactor(t *testing.T, conf *ReactorConfig) (r *Reactor, book AddrBook
 	return
 }
 
-func teardownReactor(book AddrBook) {
-	// FIXME Shouldn't rely on .(*addrBook) assertion
-	err := os.RemoveAll(filepath.Dir(book.(*addrBook).FilePath()))
-	if err != nil {
-		panic(err)
-	}
-}
-
 func createSwitchAndAddReactors(reactors ...p2p.Reactor) *p2p.Switch {
 	sw := p2p.MakeSwitch(cfg, 0, "127.0.0.1", "123.123.123", func(i int, sw *p2p.Switch) *p2p.Switch { return sw })
 	sw.SetLogger(log.TestingLogger())
