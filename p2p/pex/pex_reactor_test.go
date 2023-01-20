@@ -30,16 +30,14 @@ func init() {
 }
 
 func TestPEXReactorBasic(t *testing.T) {
-	r, book := createReactor(&ReactorConfig{})
-	defer teardownReactor(book)
+	r, _ := createReactor(t, &ReactorConfig{})
 
 	assert.NotNil(t, r)
 	assert.NotEmpty(t, r.GetChannels())
 }
 
 func TestPEXReactorAddRemovePeer(t *testing.T) {
-	r, book := createReactor(&ReactorConfig{})
-	defer teardownReactor(book)
+	r, book := createReactor(t, &ReactorConfig{})
 
 	size := book.Size()
 	peer := p2p.CreateRandomPeer(false)
@@ -122,8 +120,7 @@ func TestPEXReactorRunning(t *testing.T) {
 }
 
 func TestPEXReactorReceive(t *testing.T) {
-	r, book := createReactor(&ReactorConfig{})
-	defer teardownReactor(book)
+	r, book := createReactor(t, &ReactorConfig{})
 
 	peer := p2p.CreateRandomPeer(false)
 
@@ -139,8 +136,7 @@ func TestPEXReactorReceive(t *testing.T) {
 }
 
 func TestPEXReactorRequestMessageAbuse(t *testing.T) {
-	r, book := createReactor(&ReactorConfig{})
-	defer teardownReactor(book)
+	r, book := createReactor(t, &ReactorConfig{})
 
 	sw := createSwitchAndAddReactors(r)
 	sw.SetAddrBook(book)
@@ -173,8 +169,7 @@ func TestPEXReactorRequestMessageAbuse(t *testing.T) {
 }
 
 func TestPEXReactorAddrsMessageAbuse(t *testing.T) {
-	r, book := createReactor(&ReactorConfig{})
-	defer teardownReactor(book)
+	r, book := createReactor(t, &ReactorConfig{})
 
 	sw := createSwitchAndAddReactors(r)
 	sw.SetAddrBook(book)
@@ -204,10 +199,7 @@ func TestPEXReactorAddrsMessageAbuse(t *testing.T) {
 }
 
 func TestCheckSeeds(t *testing.T) {
-	// directory to store address books
-	dir, err := os.MkdirTemp("", "pex_reactor")
-	require.Nil(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir() + "pex_reactor"
 
 	// 1. test creating peer with no seeds works
 	peerSwitch := testCreateDefaultPeer(dir, 0)
@@ -243,10 +235,7 @@ func TestCheckSeeds(t *testing.T) {
 }
 
 func TestPEXReactorUsesSeedsIfNeeded(t *testing.T) {
-	// directory to store address books
-	dir, err := os.MkdirTemp("", "pex_reactor")
-	require.Nil(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir() + "pex_reactor"
 
 	// 1. create seed
 	seed := testCreateSeed(dir, 0, []*p2p.NetAddress{}, []*p2p.NetAddress{})
@@ -292,24 +281,18 @@ func TestConnectionSpeedForPeerReceivedFromSeed(t *testing.T) {
 }
 
 func TestPEXReactorSeedMode(t *testing.T) {
-	// directory to store address books
-	dir, err := os.MkdirTemp("", "pex_reactor")
-	require.Nil(t, err)
-	defer os.RemoveAll(dir)
-
 	pexRConfig := &ReactorConfig{SeedMode: true, SeedDisconnectWaitPeriod: 10 * time.Millisecond}
-	pexR, book := createReactor(pexRConfig)
-	defer teardownReactor(book)
+	pexR, book := createReactor(t, pexRConfig)
 
 	sw := createSwitchAndAddReactors(pexR)
 	sw.SetAddrBook(book)
-	err = sw.Start()
+	err := sw.Start()
 	require.NoError(t, err)
 	defer sw.Stop() //nolint:errcheck // ignore for tests
 
 	assert.Zero(t, sw.Peers().Size())
 
-	peerSwitch := testCreateDefaultPeer(dir, 1)
+	peerSwitch := testCreateDefaultPeer(t.TempDir()+"pex_reactor", 1)
 	require.NoError(t, peerSwitch.Start())
 	defer peerSwitch.Stop() //nolint:errcheck // ignore for tests
 
@@ -331,24 +314,18 @@ func TestPEXReactorSeedMode(t *testing.T) {
 }
 
 func TestPEXReactorDoesNotDisconnectFromPersistentPeerInSeedMode(t *testing.T) {
-	// directory to store address books
-	dir, err := os.MkdirTemp("", "pex_reactor")
-	require.Nil(t, err)
-	defer os.RemoveAll(dir)
-
 	pexRConfig := &ReactorConfig{SeedMode: true, SeedDisconnectWaitPeriod: 1 * time.Millisecond}
-	pexR, book := createReactor(pexRConfig)
-	defer teardownReactor(book)
+	pexR, book := createReactor(t, pexRConfig)
 
 	sw := createSwitchAndAddReactors(pexR)
 	sw.SetAddrBook(book)
-	err = sw.Start()
+	err := sw.Start()
 	require.NoError(t, err)
 	defer sw.Stop() //nolint:errcheck // ignore for tests
 
 	assert.Zero(t, sw.Peers().Size())
 
-	peerSwitch := testCreateDefaultPeer(dir, 1)
+	peerSwitch := testCreateDefaultPeer(t.TempDir()+"pex_reactor", 1)
 	require.NoError(t, peerSwitch.Start())
 	defer peerSwitch.Stop() //nolint:errcheck // ignore for tests
 
@@ -369,13 +346,7 @@ func TestPEXReactorDoesNotDisconnectFromPersistentPeerInSeedMode(t *testing.T) {
 }
 
 func TestPEXReactorDialsPeerUpToMaxAttemptsInSeedMode(t *testing.T) {
-	// directory to store address books
-	dir, err := os.MkdirTemp("", "pex_reactor")
-	require.Nil(t, err)
-	defer os.RemoveAll(dir)
-
-	pexR, book := createReactor(&ReactorConfig{SeedMode: true})
-	defer teardownReactor(book)
+	pexR, book := createReactor(t, &ReactorConfig{SeedMode: true})
 
 	sw := createSwitchAndAddReactors(pexR)
 	sw.SetAddrBook(book)
@@ -384,7 +355,7 @@ func TestPEXReactorDialsPeerUpToMaxAttemptsInSeedMode(t *testing.T) {
 	peer := mock.NewPeer(nil)
 	addr := peer.SocketAddr()
 
-	err = book.AddAddress(addr, addr)
+	err := book.AddAddress(addr, addr)
 	require.NoError(t, err)
 
 	assert.True(t, book.HasAddress(addr))
@@ -405,18 +376,13 @@ func TestPEXReactorSeedModeFlushStop(t *testing.T) {
 	N := 2
 	switches := make([]*p2p.Switch, N)
 
-	// directory to store address books
-	dir, err := os.MkdirTemp("", "pex_reactor")
-	require.Nil(t, err)
-	defer os.RemoveAll(dir)
-
 	books := make([]AddrBook, N)
 	logger := log.TestingLogger()
 
 	// create switches
 	for i := 0; i < N; i++ {
 		switches[i] = p2p.MakeSwitch(cfg, i, "testing", "123.123.123", func(i int, sw *p2p.Switch) *p2p.Switch {
-			books[i] = NewAddrBook(filepath.Join(dir, fmt.Sprintf("addrbook%d.json", i)), false)
+			books[i] = NewAddrBook(filepath.Join(t.TempDir(), "pex_reactor", fmt.Sprintf("addrbook%d.json", i)), false)
 			books[i].SetLogger(logger.With("pex", i))
 			sw.SetAddrBook(books[i])
 
@@ -444,7 +410,7 @@ func TestPEXReactorSeedModeFlushStop(t *testing.T) {
 	reactor := switches[0].Reactors()["pex"].(*Reactor)
 	peerID := switches[1].NodeInfo().ID()
 
-	err = switches[1].DialPeerWithAddress(switches[0].NetAddress())
+	err := switches[1].DialPeerWithAddress(switches[0].NetAddress())
 	assert.NoError(t, err)
 
 	// sleep up to a second while waiting for the peer to send us a message.
@@ -476,9 +442,8 @@ func TestPEXReactorSeedModeFlushStop(t *testing.T) {
 func TestPEXReactorDoesNotAddPrivatePeersToAddrBook(t *testing.T) {
 	peer := p2p.CreateRandomPeer(false)
 
-	pexR, book := createReactor(&ReactorConfig{})
+	pexR, book := createReactor(t, &ReactorConfig{})
 	book.AddPrivateIDs([]string{string(peer.NodeInfo().ID())})
-	defer teardownReactor(book)
 
 	// we have to send a request to receive responses
 	pexR.RequestAddrs(peer)
@@ -497,8 +462,7 @@ func TestPEXReactorDoesNotAddPrivatePeersToAddrBook(t *testing.T) {
 }
 
 func TestPEXReactorDialPeer(t *testing.T) {
-	pexR, book := createReactor(&ReactorConfig{})
-	defer teardownReactor(book)
+	pexR, book := createReactor(t, &ReactorConfig{})
 
 	sw := createSwitchAndAddReactors(pexR)
 	sw.SetAddrBook(book)
@@ -645,13 +609,8 @@ func testCreatePeerWithSeed(dir string, id int, seed *p2p.Switch) *p2p.Switch {
 	return testCreatePeerWithConfig(dir, id, conf)
 }
 
-func createReactor(conf *ReactorConfig) (r *Reactor, book AddrBook) {
-	// directory to store address book
-	dir, err := os.MkdirTemp("", "pex_reactor")
-	if err != nil {
-		panic(err)
-	}
-	book = NewAddrBook(filepath.Join(dir, "addrbook.json"), true)
+func createReactor(t *testing.T, conf *ReactorConfig) (r *Reactor, book AddrBook) {
+	book = NewAddrBook(filepath.Join(t.TempDir(), "pex_reactor", "addrbook.json"), true)
 	book.SetLogger(log.TestingLogger())
 
 	r = NewReactor(book, conf)
